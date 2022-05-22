@@ -8,7 +8,11 @@
       <SensorReadingsVisualizer
         :datapoints="sensor.getData()"
         :displayLimit="10"
-        :labels="sensor.getTimestamps().map(ts => {return ts.toLocaleTimeString()})"
+        :labels="
+          sensor.getTimestamps().map((ts) => {
+            return ts.toLocaleTimeString();
+          })
+        "
         :datasetName="sensor.id"
       />
     </div>
@@ -19,6 +23,7 @@
 <script>
 import SensorReadingsVisualizer from "./SensorReadingsVisualizer.vue";
 import { Sensor } from "../model/Sensor";
+import { SensorHandler } from "../model/SensorHandler";
 
 export default {
   name: "SensorReadingList",
@@ -36,6 +41,8 @@ export default {
         new Sensor("4"),
         new Sensor("5"),
       ],
+
+      sensorHandler: new SensorHandler(),
     };
   },
 

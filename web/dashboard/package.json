@@ -10,6 +10,7 @@
   "dependencies": {
     "chart.js": "^3.7.1",
     "core-js": "^3.6.5",
+    "mqtt": "^4.3.7",
     "vue": "^2.6.11",
     "vue-chartjs": "^4.1.0",
     "vue-material": "^1.0.0-beta-15"
