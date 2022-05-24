@@ -5,11 +5,27 @@ class SensorHandler {
   constructor() {
     this.sensors = [];
     this.mqttHandler = new MQTTHandler();
+    this.mqttHandler.setSensorOnlineCallback((id) => {this.sensorConnected(id)});
+    this.mqttHandler.setSensorOfflineCallback((id) => {this.sensorDisconnected(id)});
+    this.mqttHandler.setSensorReadingCallback((id, read) => {this.readingReceived(id, read)});
   }
 
   sensorConnected(id) {
+    console.log(`Sensor ${id} connected`);
     if (!this.idAlreadyPresent(id)) {
+      console.log("Adding sensor");
       this.sensors = this.sensors.concat(new Sensor(id));
+    }else{
+      this.getSensorByID(id).setOnline(true);
+    }
+  }
+
+  sensorDisconnected(id){
+    console.log(`Sensor offline ${id}`);
+    const sens = this.getSensorByID(id);
+    console.log(sens);
+    if(sens){
+      sens.setOnline(false);
     }
   }
 
@@ -38,7 +54,7 @@ class SensorHandler {
     if (sensor == null) {
       throw "Invalid id";
     }
-    sensor.appendData(reading);
+    sensor.appendData(reading['reading_g'], new Date(Date.now()));
   }
 }
 

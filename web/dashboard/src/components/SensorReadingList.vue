@@ -1,28 +1,28 @@
 <template>
   <div class="md-layout">
     <div
-      class="md-layout-item md-size-20 sensor-reading-container"
+      class="md-layout-item md-size-33 sensor-reading-container"
       v-for="sensor in sensors"
       :key="sensor.id"
     >
       <SensorReadingsVisualizer
         :datapoints="sensor.getData()"
-        :displayLimit="10"
+        :displayLimit="50"
         :labels="
           sensor.getTimestamps().map((ts) => {
             return ts.toLocaleTimeString();
           })
         "
         :datasetName="sensor.id"
+        :chartHeight="300"
+        :sensorOnline="sensor.online"
       />
     </div>
-    <md-button class="md-primary" @click="addData">Primary</md-button>
   </div>
 </template>
 
 <script>
 import SensorReadingsVisualizer from "./SensorReadingsVisualizer.vue";
-import { Sensor } from "../model/Sensor";
 import { SensorHandler } from "../model/SensorHandler";
 
 export default {
@@ -34,14 +34,6 @@ export default {
 
   data() {
     return {
-      sensors: [
-        new Sensor("1"),
-        new Sensor("2"),
-        new Sensor("3"),
-        new Sensor("4"),
-        new Sensor("5"),
-      ],
-
       sensorHandler: new SensorHandler(),
     };
   },
@@ -51,6 +43,12 @@ export default {
       this.sensors[0].appendData(6, new Date(Date.now()));
     },
   },
+
+  computed:{
+    sensors(){
+      return this.sensorHandler.sensors;
+    }
+  }
 };
 </script>
 

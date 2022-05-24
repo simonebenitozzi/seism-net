@@ -4,6 +4,27 @@
       :chartData="chartData"
       :width="chartWidth"
       :height="chartHeight"
+      :chartOptions="{
+        spanGaps: true,
+        animation: false,
+        plugins: {
+          tooltip: { enabled: false },
+          title:{
+            display: !sensorOnline,
+            text: 'Offline',
+            fullSize: true,
+            color: 'red'
+          }
+        },
+        responsive: true,
+        scales: {
+          y: {
+            min: -.5,
+            max: .5,
+            beginAtZero: true,
+          },
+        },
+      }"
     />
   </md-card>
 </template>
@@ -19,7 +40,7 @@ export default {
     datapoints: {
       type: Array,
       default: () => {
-        return [1, 2, 3, 4, 1, 2, 3, 4];
+        return [0.3, 0.4, 0.5, -0.6, -1.4, -0.5, -0.2, 0];
       },
     },
     labels: {
@@ -28,9 +49,9 @@ export default {
         ["1", "2", "3", "4", "1", "2", "3", "4"];
       },
     },
-    datasetName:{
+    datasetName: {
       type: String,
-      default: "Readings"
+      default: "Readings",
     },
     chartHeight: {
       type: Number,
@@ -44,6 +65,10 @@ export default {
       type: Number,
       default: null,
     },
+    sensorOnline:{
+      type: Boolean,
+      default : true
+    }
   },
   data() {
     return {
@@ -59,7 +84,9 @@ export default {
           {
             label: this.datasetName,
             data: this.filteredData,
-            borderColor: "red",
+            borderColor: "blue",
+            fill: false,
+            pointRadius: 0,
           },
         ],
       };
