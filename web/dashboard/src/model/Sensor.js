@@ -3,6 +3,7 @@ class Sensor {
     this.id = id;
     this.readings = [];
     this.online = true;
+    this.events = [];
 
     let now = Date.now();
 
@@ -18,6 +19,10 @@ class Sensor {
       this.readings = this.readings.slice(this.readings.length - 100);
       this.timestamps = this.timestamps.slice(this.timestamps.length - 100);
     }
+  }
+
+  appendEvent(ev){
+    this.events = this.events.concat(ev);
   }
 
   getData() {

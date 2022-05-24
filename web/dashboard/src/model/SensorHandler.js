@@ -5,9 +5,18 @@ class SensorHandler {
   constructor() {
     this.sensors = [];
     this.mqttHandler = new MQTTHandler();
-    this.mqttHandler.setSensorOnlineCallback((id) => {this.sensorConnected(id)});
-    this.mqttHandler.setSensorOfflineCallback((id) => {this.sensorDisconnected(id)});
-    this.mqttHandler.setSensorReadingCallback((id, read) => {this.readingReceived(id, read)});
+    this.mqttHandler.setSensorOnlineCallback((id) => {
+      this.sensorConnected(id);
+    });
+    this.mqttHandler.setSensorOfflineCallback((id) => {
+      this.sensorDisconnected(id);
+    });
+    this.mqttHandler.setSensorReadingCallback((id, read) => {
+      this.readingReceived(id, read);
+    });
+    this.mqttHandler.setOnSensorEventCallback((id, ev) => {
+      this.sensorEventReceived(id, ev);
+    });
   }
 
   sensorConnected(id) {
@@ -15,16 +24,16 @@ class SensorHandler {
     if (!this.idAlreadyPresent(id)) {
       console.log("Adding sensor");
       this.sensors = this.sensors.concat(new Sensor(id));
-    }else{
+    } else {
       this.getSensorByID(id).setOnline(true);
     }
   }
 
-  sensorDisconnected(id){
+  sensorDisconnected(id) {
     console.log(`Sensor offline ${id}`);
     const sens = this.getSensorByID(id);
     console.log(sens);
-    if(sens){
+    if (sens) {
       sens.setOnline(false);
     }
   }
@@ -54,8 +63,17 @@ class SensorHandler {
     if (sensor == null) {
       throw "Invalid id";
     }
-    sensor.appendData(reading['reading_g'], new Date(Date.now()));
+    sensor.appendData(reading["reading_g"], new Date(Date.now()));
+  }
+
+  sensorEventReceived(sensorId, event) {
+    const sensor = this.getSensorByID(sensorId);
+    if (sensor == null) {
+      throw "Invalid id";
+    }
+    event["timestamp"] = new Date(Date.now()).toISOString();
+    sensor.appendEvent(event);
   }
 }
 
-module.exports = { SensorHandler, };
+module.exports = { SensorHandler };

@@ -34,7 +34,7 @@ class MQTTHandler {
       if(levels[2] == "raw"){
         let id = levels[1];
         this.onSensorReadingCallback(id, msg);
-      }else if(levels[2] == "event"){
+      }else if(levels[2] == "events"){
         let id = levels[1];
         this.onSensorEventCallback(id, msg);
       }
