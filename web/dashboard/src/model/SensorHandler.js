@@ -6,9 +6,14 @@ class SensorHandler {
   constructor() {
     this.sensors = [];
 
-    //TODO: Don't hardcode this
-    this.earthquakeApi = new EarthquakeDataApi("localhost", "5000");
-    this.mqttHandler = new MQTTHandler();
+    this.earthquakeApi = new EarthquakeDataApi(
+      process.env.VUE_APP_WEB_API_HOSTNAME,
+      process.env.VUE_APP_WEB_API_PORT
+    );
+    this.mqttHandler = new MQTTHandler(
+      process.env.VUE_APP_MQTT_HOSTNAME,
+      process.env.VUE_APP_MQTT_PORT
+    );
     this.mqttHandler.setSensorOnlineCallback((id) => {
       this.sensorConnected(id);
     });
@@ -29,7 +34,10 @@ class SensorHandler {
       console.log("Adding sensor");
       const newSensor = new Sensor(id);
       this.sensors = this.sensors.concat(newSensor);
-      const pastReadings = await this.earthquakeApi.getPastEvents(newSensor.id, 10);
+      const pastReadings = await this.earthquakeApi.getPastEvents(
+        newSensor.id,
+        10
+      );
       newSensor.appendEvent(pastReadings);
     } else {
       this.getSensorByID(id).setOnline(true);
@@ -80,6 +88,4 @@ class SensorHandler {
     }
   }
 }
-export {
-  SensorHandler
-}
+export { SensorHandler };

@@ -1,8 +1,8 @@
 const mqtt = require("mqtt");
 
 class MQTTHandler {
-  constructor() {
-    this.client = mqtt.connect("mqtt://localhost:9001");
+  constructor(hostname, port) {
+    this.client = mqtt.connect(`mqtt://${hostname}:${port}`);
 
     this.client.on("connect", () => {
       this.client.subscribe("/status/+");
