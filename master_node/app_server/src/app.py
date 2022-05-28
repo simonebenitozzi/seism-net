@@ -35,7 +35,7 @@ def earthquakes(sensor_id = 0):
     now = datetime.now()
     for r in rows:
         result.append({
-            'datetime' : int(r[0].timestamp()),
+            'datetime' : int(r[0].timestamp() * 1000),
             'frequency' : r[1],
             'magnitude' : r[2],
             'mercalli_scale' : r[3]
