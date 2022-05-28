@@ -1,15 +1,14 @@
 import json
-# !!! install with "pip install mysql-connector-python" (mysql-connector won't work) !!!
 import mysql.connector
 import random
 
 from paho.mqtt import client as mqtt_client
 
 
-#broker = '149.132.182.144'
-broker = "broker.emqx.io"
+broker = '149.132.182.144'
+#broker = "broker.emqx.io"
 port = 1883
-topic = "quake/peaks"
+topic = "/seism/+/events"
 # generate client ID with pub prefix randomly
 client_id = f'python-mqtt-{random.randint(0, 100)}'
 # username = 'emqx'
@@ -40,26 +39,28 @@ def on_message(client, userdata, msg):
         m_decode=str(msg.payload.decode("utf-8","ignore"))
         m_in=json.loads(m_decode) #decode json data
 
-        log_earthquake(m_in["frequency"], m_in["magnitude"], m_in["mercalli"])
+        topic_parts = msg.topic.split("/")
+        sensor_id = topic_parts[2]
+        log_earthquake(m_in["frequency"], m_in["magnitude"], m_in["mercalli"], sensor_id)
         
 
-def log_earthquake(frequency, magnitude, mercalli):
+def log_earthquake(frequency, magnitude, mercalli, sensor_id):
     try:
         connection = mysql.connector.connect(host='149.132.178.180',
                                              database='sbenitozzi',
                                              user='sbenitozzi',
                                              password='iot889407')
         cursor = connection.cursor()
-        mySql_insert_query = """INSERT INTO earthquake_detection (frequency, magnitude, mercalli) 
-                                VALUES (%s, %s, %s)"""
+        mySql_insert_query = """INSERT INTO earthquake_detection (frequency, magnitude, mercalli, sensor_id) 
+                                VALUES (%s, %s, %s, %s)"""
 
-        record = (frequency, magnitude, mercalli)
+        record = (frequency, magnitude, mercalli, sensor_id)
         cursor.execute(mySql_insert_query, record)
         connection.commit()
         print("Record inserted successfully into earthquake_detection table")
 
     except mysql.connector.Error as error:
-        print("Failed to insert into MySQL table {}".format(error))
+        print("Failed to insert into MySQL table\n\t{}".format(error))
 
     finally:
         if connection.is_connected():
