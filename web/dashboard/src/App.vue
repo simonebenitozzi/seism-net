@@ -1,7 +1,7 @@
 <template>
   <md-app id="app">
     <md-app-toolbar class="md-primary">
-
+      <span class="md-title">Seismograph net</span>
     </md-app-toolbar>
     <md-app-content>
       <Dashboard />

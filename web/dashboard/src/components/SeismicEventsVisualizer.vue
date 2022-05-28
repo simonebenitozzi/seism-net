@@ -4,12 +4,13 @@
     :md-sort.sync="currentSort"
     :md-sort-order.sync="currentSortOrder"
     md-card
+    class="table"
   >
     <md-table-row slot="md-table-row" slot-scope="{ item }">
       <md-table-cell md-label="Timestamp" md-sort-by="timestamp">{{
         item.timestamp
       }}</md-table-cell>
-      <md-table-cell md-label="Frequency" md-numeric>{{
+      <md-table-cell md-label="Frequency(Hz)" md-numeric>{{
         item.frequency
       }}</md-table-cell>
       <md-table-cell md-label="Magnitude" md-numeric md-sort-by="magnitude">{{
@@ -44,8 +45,14 @@ export default {
   data: () => {
     return {
       currentSort: "timestamp",
-      currentSortOrder: "asc",
+      currentSortOrder: "desc",
     };
   },
 };
 </script>
+
+<style scoped>
+.table{
+  max-height: inherit;
+}
+</style>

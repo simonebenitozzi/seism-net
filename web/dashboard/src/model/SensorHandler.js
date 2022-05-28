@@ -60,19 +60,17 @@ class SensorHandler {
 
   readingReceived(sensorId, reading) {
     const sensor = this.getSensorByID(sensorId);
-    if (sensor == null) {
-      throw "Invalid id";
+    if (sensor != null) {
+      sensor.appendData(reading["reading_g"], new Date(Date.now()));
     }
-    sensor.appendData(reading["reading_g"], new Date(Date.now()));
   }
 
   sensorEventReceived(sensorId, event) {
     const sensor = this.getSensorByID(sensorId);
-    if (sensor == null) {
-      throw "Invalid id";
+    if (sensor != null) {
+      event["timestamp"] = new Date(Date.now()).toISOString();
+      sensor.appendEvent(event);
     }
-    event["timestamp"] = new Date(Date.now()).toISOString();
-    sensor.appendEvent(event);
   }
 }
 
