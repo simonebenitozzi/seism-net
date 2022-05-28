@@ -1,6 +1,7 @@
 <template>
   <md-card>
     <LineChartGenerator
+      class="chart"
       :chartData="chartData"
       :width="chartWidth"
       :height="chartHeight"
@@ -114,3 +115,9 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.chart{
+  max-height: inherit;
+}
+</style>
