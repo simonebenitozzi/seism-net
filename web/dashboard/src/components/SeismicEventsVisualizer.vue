@@ -8,7 +8,7 @@
   >
     <md-table-row slot="md-table-row" slot-scope="{ item }">
       <md-table-cell md-label="Timestamp" md-sort-by="timestamp">{{
-        item.timestamp
+        item.timestamp.toISOString()
       }}</md-table-cell>
       <md-table-cell md-label="Frequency(Hz)" md-numeric>{{
         item.frequency

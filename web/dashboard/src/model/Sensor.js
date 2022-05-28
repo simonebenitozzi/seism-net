@@ -23,6 +23,7 @@ class Sensor {
 
   appendEvent(ev){
     this.events = this.events.concat(ev);
+    this.events.sort((a,b) => a.datetime - b.datetime);
   }
 
   getData() {

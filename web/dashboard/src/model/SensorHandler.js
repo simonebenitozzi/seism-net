@@ -1,9 +1,13 @@
 const { Sensor } = require("./Sensor");
 const { MQTTHandler } = require("../api/mqtt");
+import { EarthquakeDataApi } from "../api/earthquakeDataApi";
 
 class SensorHandler {
   constructor() {
     this.sensors = [];
+
+    //TODO: Don't hardcode this
+    this.earthquakeApi = new EarthquakeDataApi("localhost", "5000");
     this.mqttHandler = new MQTTHandler();
     this.mqttHandler.setSensorOnlineCallback((id) => {
       this.sensorConnected(id);
@@ -19,11 +23,14 @@ class SensorHandler {
     });
   }
 
-  sensorConnected(id) {
+  async sensorConnected(id) {
     console.log(`Sensor ${id} connected`);
     if (!this.idAlreadyPresent(id)) {
       console.log("Adding sensor");
-      this.sensors = this.sensors.concat(new Sensor(id));
+      const newSensor = new Sensor(id);
+      this.sensors = this.sensors.concat(newSensor);
+      const pastReadings = await this.earthquakeApi.getPastEvents(newSensor.id, 10);
+      newSensor.appendEvent(pastReadings);
     } else {
       this.getSensorByID(id).setOnline(true);
     }
@@ -68,10 +75,11 @@ class SensorHandler {
   sensorEventReceived(sensorId, event) {
     const sensor = this.getSensorByID(sensorId);
     if (sensor != null) {
-      event["timestamp"] = new Date(Date.now()).toISOString();
+      event["timestamp"] = new Date(Date.now());
       sensor.appendEvent(event);
     }
   }
 }
-
-module.exports = { SensorHandler };
+export {
+  SensorHandler
+}
