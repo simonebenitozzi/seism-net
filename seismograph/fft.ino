@@ -3,11 +3,11 @@ arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
 
 #define SISM_FREQ_LOW_BOUND_Hz 2
 #define SISM_FREQ_HIGH_BOUND_Hz 20
-#define SISM_MAG_LOW_BOUND_G 0.00297
+#define SISM_MAG_LOW_BOUND_G 0.0276
 
 void compute_vibration(double *vReal, double *vImag, unsigned short sample_size)
 {
-    FFT.Windowing(vReal, sample_size, FFT_WIN_TYP_HAMMING, FFT_FORWARD); /* Weigh data */
+    FFT.Windowing(vReal, sample_size, FFT_WIN_TYP_HANN, FFT_FORWARD); /* Weigh data */
     FFT.Compute(vReal, vImag, sample_size, FFT_FORWARD);                 /* Compute FFT */
     FFT.ComplexToMagnitude(vReal, vImag, sample_size);
 }
