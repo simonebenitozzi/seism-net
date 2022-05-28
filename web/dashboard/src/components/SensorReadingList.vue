@@ -1,28 +1,44 @@
 <template>
   <div class="md-layout" id="root">
     <div
-      class="md-layout-item md-size-100 sensor-reading-container md-layout"
+      class="md-layout-item md-size-33 sensor-reading-container"
       v-for="sensor in sensors"
       :key="sensor.id"
     >
-      <div class="md-layout-item md-size-40 sensor-reading-col">
+      <md-card class="sensor-reading-col">
         <SensorReadingsVisualizer
+          id="readings-chart"
           :datapoints="sensor.getData()"
           :displayLimit="50"
-          :labels="
-            sensor.getTimestamps().map((ts) => {
-              return ts.toLocaleTimeString();
-            })
-          "
+          :labels="sensor.timestampsToString"
           :datasetName="sensor.id"
-          :chartHeight="250"
+          :chartHeight="150"
           :chartWidth="300"
           :sensorOnline="sensor.online"
         />
-      </div>
-      <div class="md-layout-item md-size-60 sensor-reading-col">
-        <SeismicEventsVisualizer :events="sensor.events"/>
-      </div>
+        <md-divider></md-divider>
+        <div id="table-container">
+          <SeismicEventsVisualizer
+            v-if="sensor.events.length > 0"
+            :events="sensor.events.map(ev =>  {
+              return{
+                timestamp: ev.timestamp.toISOString(),
+                frequency: ev.frequency,
+                magnitude: ev.magnitude,
+                mercalli: ev.mercalli,
+
+              }
+            })"
+          />
+          <md-empty-state
+            v-else
+            md-label="No notable seismic data available"
+            md-icon="timeline"
+          ></md-empty-state>
+        </div>
+      </md-card>
+      <!-- <div class="md-layout-item md-size-60 sensor-reading-col">
+      </div> -->
     </div>
   </div>
 </template>
@@ -62,16 +78,25 @@ export default {
 
 <style scoped>
 .sensor-reading-container {
-  margin-bottom: 5rem !important;
+  margin-bottom: 0.5rem !important;
   height: 25rem;
   max-height: 29.5rem;
 }
 
-.sensor-reading-col{
+.sensor-reading-col {
   max-height: inherit;
+  height: inherit;
+  display: flex;
+  flex-direction: column;
 }
 
-#root{
-  flex-direction: column;
+#table-container {
+  flex-grow: 1;
+
+}
+
+#readings-chart{
+  flex-grow: 0;
+  flex-shrink: 0;
 }
 </style>

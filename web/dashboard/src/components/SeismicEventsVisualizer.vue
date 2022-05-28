@@ -3,12 +3,11 @@
     v-model="events"
     :md-sort.sync="currentSort"
     :md-sort-order.sync="currentSortOrder"
-    md-card
     class="table"
   >
     <md-table-row slot="md-table-row" slot-scope="{ item }">
       <md-table-cell md-label="Timestamp" md-sort-by="timestamp">{{
-        item.timestamp.toISOString()
+        item.timestamp
       }}</md-table-cell>
       <md-table-cell md-label="Frequency(Hz)" md-numeric>{{
         item.frequency
@@ -21,6 +20,7 @@
       }}</md-table-cell>
     </md-table-row>
   </md-table>
+  
 </template>
 
 <script>
@@ -53,6 +53,7 @@ export default {
 
 <style scoped>
 .table{
-  max-height: inherit;
+  height: 95%;
+  max-height: 95%;
 }
 </style>

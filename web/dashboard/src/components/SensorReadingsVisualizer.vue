@@ -1,5 +1,4 @@
 <template>
-  <md-card>
     <LineChartGenerator
       class="chart"
       :chartData="chartData"
@@ -27,7 +26,6 @@
         },
       }"
     />
-  </md-card>
 </template>
 
 <script>
@@ -56,7 +54,7 @@ export default {
     },
     chartHeight: {
       type: Number,
-      default: 200,
+      default: 100,
     },
     chartWidth: {
       type: Number,
