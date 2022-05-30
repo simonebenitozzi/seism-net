@@ -16,8 +16,6 @@ StaticJsonDocument<PEAK_MESSAGE_CAPACITY> peak_message_doc;
 
 void connectToMQTTBroker(WiFiClient& client)
 {
-    mqttClient.begin(MQTT_BROKERIP, 1883, client);
-    mqttClient.setTimeout(1000);
     if (!mqttClient.connected())
     { // not connected
         Serial.print(F("\nConnecting to MQTT broker..."));
@@ -32,17 +30,18 @@ void connectToMQTTBroker(WiFiClient& client)
 
 bool mqtt_init(WiFiClient &wiClient)
 {
-    connectToMQTTBroker(wiClient);
-    StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
-    doc["online"] = false;
+    mqttClient.begin(MQTT_BROKERIP, 1883, wiClient);
+    mqttClient.setTimeout(1000);
 
     char topic[64];
+    StaticJsonDocument<JSON_OBJECT_SIZE(1)> doc;
+    doc["online"] = false;
     String mac = formatted_mac();
     snprintf(topic, 64, MQTT_TOPIC_STATUS, mac.c_str());
     size_t n = serializeJson(doc, mqtt_buffer);
     mqttClient.setWill(topic, mqtt_buffer, true, 2);
-
-
+    
+    connectToMQTTBroker(wiClient);
     doc["online"] = true;
     n = serializeJson(doc, mqtt_buffer);
     mqttClient.publish(topic, mqtt_buffer, n, true, 2);

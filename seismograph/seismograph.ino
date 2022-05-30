@@ -57,6 +57,8 @@ void setup()
     mpu.set_acc_bandwidth(acc_20Hz);
     mpu.set_gyro_bandwidth(gyro_20Hz);
 
+    mqtt_init(wifiClient);
+
     Serial.println("Setup completed!");
     mqtt_init(wifiClient);
 }
