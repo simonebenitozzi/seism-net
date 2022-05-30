@@ -26,6 +26,7 @@ mydb = mysql.connector.connect(
 @app.route("/seismograph/<sensor_id>/events")
 @cross_origin()
 def earthquakes(sensor_id = 0):
+    mydb.reconnect()
     args = request.args
     limit = args.get('limit', 20)
     cursor = mydb.cursor()
