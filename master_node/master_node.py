@@ -1,11 +1,11 @@
+import asyncio
 import json
-import mysql.connector
 import random
+from asyncio_mqtt import Client
+from db import SeismLogger
 
-from paho.mqtt import client as mqtt_client
 
-
-broker = '149.132.182.144'
+broker = 'localhost'
 #broker = "broker.emqx.io"
 port = 1883
 topic = "/seism/+/events"
@@ -15,64 +15,46 @@ client_id = f'python-mqtt-{random.randint(0, 100)}'
 # password = 'public'
 
 
-def connect_mqtt() -> mqtt_client:
-    def on_connect(client, userdata, flags, rc):
-        if rc == 0:
-            print("Connected to MQTT Broker!")
-        else:
-            print("Failed to connect, return code %d\n", rc)
+class MQTTAppplication:
 
-    client = mqtt_client.Client(client_id)
-    # client.username_pw_set(username, password)
-    client.on_connect = on_connect
-    client.connect(broker, port)
-    return client
+    def __init__(self, host, port, client_id) -> None:
+        self.host = host
+        self.port = port
+        self.client_id = client_id
+        self.client = Client(self.host, port=self.port,
+                             client_id=self.client_id)
 
+    async def start(self, event_loop: asyncio.BaseEventLoop, seism_logger):
+        tasks = set()
+        topic = "/seism/+/events"
 
-def subscribe(client: mqtt_client):
-    client.subscribe(topic)
-    client.on_message = on_message
+        messages = self.client.filtered_messages(topic)
+        task = event_loop.create_task(
+            self.handle_seismic_event_msg(messages, seism_logger))
+        tasks.add(task)
+        await self.client.connect()
+        await self.client.subscribe(topic)
 
-def on_message(client, userdata, msg):
-        print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
+        return tasks
 
-        m_decode=str(msg.payload.decode("utf-8","ignore"))
-        m_in=json.loads(m_decode) #decode json data
-
-        topic_parts = msg.topic.split("/")
-        sensor_id = topic_parts[2]
-        log_earthquake(m_in["frequency"], m_in["magnitude"], m_in["mercalli"], sensor_id)
-        
-
-def log_earthquake(frequency, magnitude, mercalli, sensor_id):
-    try:
-        connection = mysql.connector.connect(host='149.132.178.180',
-                                             database='sbenitozzi',
-                                             user='sbenitozzi',
-                                             password='iot889407')
-        cursor = connection.cursor()
-        mySql_insert_query = """INSERT INTO earthquake_detection (frequency, magnitude, mercalli, sensor_id) 
-                                VALUES (%s, %s, %s, %s)"""
-
-        record = (frequency, magnitude, mercalli, sensor_id)
-        cursor.execute(mySql_insert_query, record)
-        connection.commit()
-        print("Record inserted successfully into earthquake_detection table")
-
-    except mysql.connector.Error as error:
-        print("Failed to insert into MySQL table\n\t{}".format(error))
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-            print("MySQL connection is closed")
-
-def run():
-    client = connect_mqtt()
-    subscribe(client)
-    client.loop_forever()
+    async def handle_seismic_event_msg(self, message_generator, logger: SeismLogger):
+        async with message_generator as messages:
+            async for message in messages:
+                data = json.loads(message.payload.decode())
+                sensor_id = message.topic.split("/")[2]
+                print(f'{sensor_id}:{data}')
+                await logger.log_quake(frequency=data['frequency'],
+                                       magnitude=data['magnitude'],
+                                       mercalli=data['mercalli'],
+                                       sensor_id=sensor_id)
 
 
-if __name__ == '__main__':
-    run()
+async def main():
+    logger = SeismLogger(host="149.132.178.180", database='sbenitozzi',
+                         username="sbenitozzi", password="iot889407")
+    await logger.connect(asyncio.get_event_loop())
+    app = MQTTAppplication(broker, port, 'master_node')
+    await asyncio.gather(*await app.start(asyncio.get_event_loop(), logger))
+
+if __name__ == "__main__":
+    asyncio.run(main())
