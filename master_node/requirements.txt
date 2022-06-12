@@ -1,0 +1,5 @@
+python-telegram-bot==20.0a1
+aiomysql
+asyncio-mqtt
+aiohttp
+geopy

@@ -5,20 +5,25 @@ from queue import Queue
 from telegram import Update, Bot
 import telegram
 import telegram.ext
-from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+from seism_alert import SeismAlertWatch, WebSeismicEvent
 
-import mysql.connector
+# import mysql.connector
 
 from geopy.geocoders import Nominatim
 
+from db import SeismEventSubscriptionMapper, DBPool, DBConnectionInfo, SeismEventMapper
+from master_node import MQTTAppplication, MQTTSeismicEvent
+
 
 telegram_token = "5512730466:AAF8CiMl8yUz3Kg1og6oPW9f6MoPtBUHhSg"
-my_chat_id = "152601730" # for testing
+my_chat_id = "152601730"  # for testing
 
 db_host = '149.132.178.180'
 db_name = 'sbenitozzi'
 db_user = 'sbenitozzi'
 db_password = 'iot889407'
+
 
 geolocator_username = "overlap@group.com"
 
@@ -27,266 +32,21 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+connection_info = DBConnectionInfo(
+    host=db_host, database=db_name, username=db_user, password=db_password)
+DBPool.get_instance(connection_info, asyncio.get_event_loop())
+
+
+
 # Converte coordinate da decimali a gradi
 def decdeg2dms(dd):
     is_positive = dd >= 0
     dd = abs(dd)
-    minutes,seconds = divmod(dd*3600,60)
-    degrees,minutes = divmod(minutes,60)
+    minutes, seconds = divmod(dd*3600, 60)
+    degrees, minutes = divmod(minutes, 60)
     degrees = degrees if is_positive else -degrees
-    return (degrees,minutes,seconds)
+    return (degrees, minutes, seconds)
 
-async def start_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Welcome on the overlap Bot!\nPlease enter your Location and a Radius of your choice, using the apposite commands. /help")
-
-async def help_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    help_message = f"""I can help you subscribe for Earthquakes updates\n\nYou can control me by sending these commands:\n
-/city - Enter your city (must be followed by a city name)
-/zipcode - Enter your zipcode (must be followed by a zipcode)
-/coordinates - Enter your coordinates (must be followed by latitude and longitude)
-/radius - Enter a radius around your location (must be followed by a positive number)
-/status - Get info about the information you inserted"""
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=help_message)
-
-
-async def city_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    text = update.message.text
-    if len(text) < 7:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="No city inserted")
-        return    
-
-    city = text[6:]
-    geolocator = Nominatim(user_agent=geolocator_username)
-    loc = geolocator.geocode(city)
-    
-    if log_coordinates(chat_id, loc.latitude, loc.longitude):
-        status = get_status(chat_id)
-        if status[1]:   #checks if radius is already inserted
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
-        else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
-        
-async def zipcode_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    text = update.message.text
-    if len(text.split()) < 2:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="No zipcode inserted")
-        return    
-
-    zipcode = text.split[2]
-    geolocator = Nominatim(user_agent=geolocator_username)
-    loc = geolocator.geocode(zipcode)
-    
-    if log_coordinates(chat_id, loc.latitude, loc.longitude):
-        status = get_status(chat_id)
-        if status[1]:   #checks if radius is already inserted
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
-        else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
-        
-async def coordinates_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    text = update.message.text
-
-    if len(text.split()) < 3:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Not enough parameters: please enter both Latitude and Longitude")
-        return
-
-    try:
-        latitude = float(text.split()[1])
-        longitude = float(text.split()[2])
-    except ValueError:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid input: Latitude and Longitude must be numeric values")
-        return
-
-    if abs(latitude) > 90:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Latitude not valid: please insert a number between -90 and 90")
-        return
-
-    if abs(longitude) > 180:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Longitude not valid: please insert a number between -180 and 180")
-        return
-
-    if log_coordinates(chat_id, latitude, longitude):
-        status = get_status(chat_id)
-        if status[1]:   #checks if radius is already inserted
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
-        else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
-        
-
-async def radius_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    text = update.message.text
-
-    if len(text.split()) < 2:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius not inserted")
-        return
-        
-    try:
-        radius = float(text.split()[1])
-    except ValueError:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid input: Radius must be a numeric value")
-        return
-
-    if radius < 0:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius not valid: please insert a positive number")
-        return
-
-    
-    if log_radius(chat_id, radius):
-        status = get_status(chat_id)
-        if status[0]:   #checks if coordinates are already inserted
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius has been updated!\nYou're ready to receive your updates!")
-        else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius has been updated!\nYour Location has not been inserted yet")
-
-async def status_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    
-    status = get_status(chat_id)
-    if status[0] and status[1]:   #checks if coordinates and Radius are already inserted
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="You have already inserted Location and Radius.\nYou're ready to receive your updates!")
-    elif not status[0] and not status[1]:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Location and Radius yet. /help")
-    elif not status[0]:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Location yet. /help")
-    elif not status[1]:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Radius yet. /help")
-
-async def unknown_command(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command. /help")
-
-def log_coordinates(chat_id, latitude, longitude):
-    try:
-        connection = mysql.connector.connect(host=db_host,
-                                             database=db_name,
-                                             user=db_user,
-                                             password=db_password)
-        cursor = connection.cursor()
-        mySql_insert_query = """INSERT INTO telegram_subs (chat_id, latitude, longitude) VALUES(%s, %s, %s) 
-                                ON DUPLICATE KEY UPDATE latitude=%s, longitude=%s"""
-
-        record = (chat_id, latitude, longitude, latitude, longitude)
-        cursor.execute(mySql_insert_query, record)
-        connection.commit()
-        print("Coordinates inserted successfully into telegram_subs table")
-        return True
-
-    except mysql.connector.Error as error:
-        print("Failed to insert into MySQL table\n\t{}".format(error))
-        return False
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-def log_radius(chat_id, radius):
-    try:
-        connection = mysql.connector.connect(host=db_host,
-                                             database=db_name,
-                                             user=db_user,
-                                             password=db_password)
-        cursor = connection.cursor()
-        mySql_insert_query = """INSERT INTO telegram_subs (chat_id, radius) VALUES(%s, %s) 
-                                ON DUPLICATE KEY UPDATE radius=%s"""
-
-        record = (chat_id, radius, radius)
-        cursor.execute(mySql_insert_query, record)
-        connection.commit()
-        print("Radius inserted successfully into telegram_subs table")
-        return True
-
-    except mysql.connector.Error as error:
-        print("Failed to insert into MySQL table\n\t{}".format(error))
-        return False
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-def get_status(chat_id):
-    try:
-        connection = mysql.connector.connect(host=db_host,
-                                             database=db_name,
-                                             user=db_user,
-                                             password=db_password)
-        cursor = connection.cursor()
-        mySql_select_query = """SELECT * FROM telegram_subs WHERE chat_id=%s"""
-
-        cursor.execute(mySql_select_query, (chat_id,))
-        row = cursor.fetchone()
-
-        status = [False, False]
-        if row == None:
-            return status
-        status[0] = (row[1] != None) and (row[2] != None)
-        status[1] = row[3] != None
-        return status
-
-    except mysql.connector.Error as error:
-        print("Failed to retrieve from MySQL table\n\t{}".format(error))
-        return [False, False]
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-def retrieve_all_subs():
-    try:
-        connection = mysql.connector.connect(host=db_host,
-                                             database=db_name,
-                                             user=db_user,
-                                             password=db_password)
-        cursor = connection.cursor()
-        mySql_select_query = """SELECT * FROM telegram_subs"""
-
-        cursor.execute(mySql_select_query)
-        return cursor.fetchall()
-
-    except mysql.connector.Error as error:
-        print("Failed to retrieve from MySQL table\n\t{}".format(error))
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-def retrieve_subs_in_radius(latitude, longitude):
-    return retrieve_all_subs # Da modificare
-
-def build_app():
-
-    application = ApplicationBuilder().token(telegram_token).build()
-    start_handler = CommandHandler('start', start_command)
-    help_handler = CommandHandler('help', help_command)
-
-    city_handler = CommandHandler('city', city_command)
-    zipcode_handler = CommandHandler('zipcode', zipcode_command)
-    coordinates_handler = CommandHandler('coordinates', coordinates_command)
-    radius_handler = CommandHandler('radius', radius_command)
-    status_handler = CommandHandler('status', status_command)
-
-    text_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), unknown_command)
-    unknown_handler = MessageHandler(filters.COMMAND, unknown_command)
-
-    application.add_handler(start_handler)
-    application.add_handler(help_handler)
-    
-    application.add_handler(city_handler)
-    application.add_handler(zipcode_handler)
-    application.add_handler(coordinates_handler)
-    application.add_handler(radius_handler)
-    application.add_handler(status_handler)
-    
-    application.add_handler(text_handler)
-    application.add_handler(unknown_handler)
-    
-    application.run_polling(stop_signals=None)
 
 async def event_updater():
     queue = Queue()
@@ -294,16 +54,211 @@ async def event_updater():
         async with telegram.ext.Updater(test_bot, queue) as updater:
             await updater.bot.send_message(chat_id=my_chat_id, text='Hello')
 
+class EarthquakeTelegramBot:
+
+    def __init__(self) -> None:
+
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.application = ApplicationBuilder().token(telegram_token).build()
+        self.start_handler = CommandHandler('start', self.start_command)
+        self.help_handler = CommandHandler('help', self.help_command)
+
+        self.city_handler = CommandHandler('city', self.city_command)
+        self.zipcode_handler = CommandHandler('zipcode', self.zipcode_command)
+        self.coordinates_handler = CommandHandler('coordinates', self.coordinates_command)
+        self.radius_handler = CommandHandler('radius', self.radius_command)
+        self.status_handler = CommandHandler('status', self.status_command)
+
+        self.text_handler = MessageHandler(
+            filters.TEXT & (~filters.COMMAND), self.unknown_command)
+        self.unknown_handler = MessageHandler(filters.COMMAND, self.unknown_command)
+
+        self.application.add_handler(self.start_handler)
+        self.application.add_handler(self.help_handler)
+
+        self.application.add_handler(self.city_handler)
+        self.application.add_handler(self.zipcode_handler)
+        self.application.add_handler(self.coordinates_handler)
+        self.application.add_handler(self.radius_handler)
+        self.application.add_handler(self.status_handler)
+
+        self.application.add_handler(self.text_handler)
+        self.application.add_handler(self.unknown_handler)
+        
+
+        self.seism_alert_watch = SeismAlertWatch(self.application, 1)
+        # self.seism_alert_watch.start(self.application)
+
+        self.mqtt_app = MQTTAppplication('localhost', 1883, 'master_node')
+        self.seismic_event_mapper = SeismEventMapper()
+        self.seism_subscription_mapper = SeismEventSubscriptionMapper()
+        
+        
+        self.application.post_init = self.schedule_auxiliary_tasks
+        self.application.run_polling(stop_signals=None, close_loop=False)
+        asyncio.run(DBPool.get_instance().close())
+        asyncio.run(self.mqtt_app.stop())
+        
+
+
+    async def schedule_auxiliary_tasks(self, args):
+        self.application.job_queue.run_custom(self.seism_alert_watch.task, {}, data = {
+            'on_alert_callback' : self.on_seism_api_event
+        })
+        self.application.job_queue.run_custom(self.mqtt_app.handle_seismic_event_msg, {}, data = {
+            'on_event_callback' : self.on_mqtt_event
+        })
+
+    async def on_mqtt_event(self, event : MQTTSeismicEvent):
+        self.logger.info('Received seismic event')
+        await self.seismic_event_mapper.log_quake(event)
+
+    async def on_seism_api_event(self, event : WebSeismicEvent):
+        to_alert_users = await self.seism_subscription_mapper.get_all_subs_in_radius(event.latitude, event.longitude)
+        text = f"""
+There has been an earthquake in range of your selection:
+Magnitude: {event.magnitude}
+Latitude: {event.latitude}
+Longitude: {event.longitude}
+        """
+        for to_alert in to_alert_users:
+            await self.application.updater.bot.send_message(to_alert['chat_id'], text)
+
+
+    async def start_command(self, update: Update, context):
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Welcome on the overlap Bot!\nPlease enter your Location and a Radius of your choice, using the apposite commands. /help")
+
+
+    async def help_command(self, update: Update, context):
+        help_message = f"""I can help you subscribe for Earthquakes updates\n\nYou can control me by sending these commands:\n
+    /city - Enter your city (must be followed by a city name)
+    /zipcode - Enter your zipcode (must be followed by a zipcode)
+    /coordinates - Enter your coordinates (must be followed by latitude and longitude)
+    /radius - Enter a radius around your location in kilometers (must be followed by a positive number)
+    /status - Get info about the information you inserted"""
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=help_message)
+
+
+    async def city_command(self, update: Update, context):
+        chat_id = update.effective_chat.id
+        text = update.message.text
+        if len(text) < 7:
+            await context.bot.send_message(chat_id=update.effective_chat.id,
+                                        text="No city inserted")
+            return
+
+        city = text[6:]
+        geolocator = Nominatim(user_agent=geolocator_username)
+        loc = geolocator.geocode(city)
+
+        if await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude):
+            status = await self.seism_subscription_mapper.get_status(chat_id)
+            if status['radius']:  # checks if radius is already inserted
+                await context.bot.send_message(chat_id=update.effective_chat.id,
+                                            text="Your Location has been updated!\nYou're ready to receive your updates!")
+            else:
+                await context.bot.send_message(chat_id=update.effective_chat.id,
+                                            text="Your Location has been updated!\nRadius has not been inserted yet")
+
+
+    async def zipcode_command(self, update: Update, context):
+        chat_id = update.effective_chat.id
+        text = update.message.text
+        if len(text.split()) < 2:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="No zipcode inserted")
+            return
+
+        zipcode = text.split[2]
+        geolocator = Nominatim(user_agent=geolocator_username)
+        loc = geolocator.geocode(zipcode)
+
+        if await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude):
+            status = await self.seism_subscription_mapper.get_status(chat_id)
+            if status['radius']:  # checks if radius is already inserted
+                await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
+            else:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
+
+
+    async def coordinates_command(self, update: Update, context):
+        chat_id = update.effective_chat.id
+        text = update.message.text
+
+        if len(text.split()) < 3:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Not enough parameters: please enter both Latitude and Longitude")
+            return
+
+        try:
+            latitude = float(text.split()[1])
+            longitude = float(text.split()[2])
+        except ValueError:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid input: Latitude and Longitude must be numeric values")
+            return
+
+        if abs(latitude) > 90:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Latitude not valid: please insert a number between -90 and 90")
+            return
+
+        if abs(longitude) > 180:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Longitude not valid: please insert a number between -180 and 180")
+            return
+
+        if self.seism_subscription_mapper.log_coordinates(chat_id, latitude, longitude):
+            status = await self.seism_subscription_mapper.get_status(chat_id)
+            if status['radius']:  # checks if radius is already inserted
+                await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
+            else:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
+
+
+    async def radius_command(self, update: Update, context):
+        chat_id = update.effective_chat.id
+        text = update.message.text
+
+        if len(text.split()) < 2:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius not inserted")
+            return
+
+        try:
+            radius = float(text.split()[1])
+        except ValueError:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Invalid input: Radius must be a numeric value")
+            return
+
+        if radius < 0:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius not valid: please insert a positive number")
+            return
+
+        if await self.seism_subscription_mapper.insert_radius(chat_id, radius):
+            status = await self.seism_subscription_mapper.get_status(chat_id)
+            if status['coordinates']:  # checks if coordinates are already inserted
+                await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius has been updated!\nYou're ready to receive your updates!")
+            else:
+                await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius has been updated!\nYour Location has not been inserted yet")
+
+
+    async def status_command(self, update: Update, context):
+        chat_id = update.effective_chat.id
+
+        status = await self.seism_subscription_mapper.get_status(chat_id)
+        # checks if coordinates and Radius are already inserted
+        if status['coordinates'] and status['radius']:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="You have already inserted Location and Radius.\nYou're ready to receive your updates!")
+        elif not status['coordinates'] and not status['radius']:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Location and Radius yet. /help")
+        elif not status['coordinates']:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Location yet. /help")
+        elif not status['radius']:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Radius yet. /help")
+
+
+    async def unknown_command(self, update: Update, context):
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command. /help")
+
+
+
 if __name__ == '__main__':
-    
-    build_app()
+
+    bot = EarthquakeTelegramBot()
+
     # asyncio.run(event_updater())
-
-
-
-
-
-    
-
-   
-
