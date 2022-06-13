@@ -13,7 +13,7 @@ from seism_alert import SeismAlertWatch, WebSeismicEvent
 from geopy.geocoders import Nominatim
 
 from db import SeismEventSubscriptionMapper, DBPool, DBConnectionInfo, SeismEventMapper
-from master_node import MQTTAppplication, MQTTSeismicEvent
+from master_node import MQTTAppplication, MQTTSeismicEvent, NewMQTTApplication
 
 
 telegram_token = "5512730466:AAF8CiMl8yUz3Kg1og6oPW9f6MoPtBUHhSg"
@@ -86,10 +86,10 @@ class EarthquakeTelegramBot:
         self.application.add_handler(self.unknown_handler)
         
 
-        self.seism_alert_watch = SeismAlertWatch(self.application, 1)
-        # self.seism_alert_watch.start(self.application)
+        self.seism_alert_watch = SeismAlertWatch(60)
 
-        self.mqtt_app = MQTTAppplication('localhost', 1883, 'master_node')
+        self.mqtt_app = NewMQTTApplication('localhost', 1883, 'master_node')
+        self.mqtt_app.connect()
         self.seismic_event_mapper = SeismEventMapper()
         self.seism_subscription_mapper = SeismEventSubscriptionMapper()
         
@@ -101,13 +101,20 @@ class EarthquakeTelegramBot:
         
 
 
+    # async def start(self):
+    #     await self.application.initialize()
+    #     await self.schedule_auxiliary_tasks(None)
+    #     await self.application.start()
+    #     await self.application.updater.
+
     async def schedule_auxiliary_tasks(self, args):
         self.application.job_queue.run_custom(self.seism_alert_watch.task, {}, data = {
             'on_alert_callback' : self.on_seism_api_event
         })
-        self.application.job_queue.run_custom(self.mqtt_app.handle_seismic_event_msg, {}, data = {
+        self.application.job_queue.run_custom(self.mqtt_app.loop, {}, data = {
             'on_event_callback' : self.on_mqtt_event
         })
+
 
     async def on_mqtt_event(self, event : MQTTSeismicEvent):
         self.logger.info('Received seismic event')
@@ -150,8 +157,12 @@ Longitude: {event.longitude}
         city = text[6:]
         geolocator = Nominatim(user_agent=geolocator_username)
         loc = geolocator.geocode(city)
-
-        if await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude):
+        
+        if loc == None:
+            await context.bot.send_message(chat_id=update.effective_chat.id,
+                                           text="Error: your city was not found")
+        else:
+            await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude)
             status = await self.seism_subscription_mapper.get_status(chat_id)
             if status['radius']:  # checks if radius is already inserted
                 await context.bot.send_message(chat_id=update.effective_chat.id,
@@ -171,8 +182,10 @@ Longitude: {event.longitude}
         zipcode = text.split[2]
         geolocator = Nominatim(user_agent=geolocator_username)
         loc = geolocator.geocode(zipcode)
-
-        if await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude):
+        if loc == None:
+            context.bot.send_message(chat_id=update.effective_chat.id, text="The zipcode you entered was not found.")
+        else:
+            await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude)
             status = await self.seism_subscription_mapper.get_status(chat_id)
             if status['radius']:  # checks if radius is already inserted
                 await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
@@ -261,4 +274,4 @@ if __name__ == '__main__':
 
     bot = EarthquakeTelegramBot()
 
-    # asyncio.run(event_updater())
+    # asyncio.run(bot.start())
