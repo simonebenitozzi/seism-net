@@ -9,6 +9,8 @@ NOTE2: All offset settings are stored in volatile memory so they
 have to be set every time the module is reset.
 */
 
+#include "offset_cancellation.h"
+
 void adjust_offset(MPU9255 &mpu)
 {
   //set bandwidths to 5Hz to reduce the noise

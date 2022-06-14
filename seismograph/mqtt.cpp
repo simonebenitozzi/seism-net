@@ -1,6 +1,9 @@
 #include <ArduinoJson.h>
 #include <MQTT.h>
 #include <WiFi101.h>
+#include "mqtt.h"
+#include "conf.hpp"
+#include "fft.h"
 
 #define MQTT_BUFFER_SIZE 256
 #define MQTT_TOPIC_PEAKS "/seism/%s/events"
@@ -11,7 +14,7 @@ char mqtt_buffer[MQTT_BUFFER_SIZE];
 
 String formatted_mac();
 
-const int PEAK_MESSAGE_CAPACITY = JSON_OBJECT_SIZE(3);
+const int PEAK_MESSAGE_CAPACITY = JSON_OBJECT_SIZE(6);
 StaticJsonDocument<PEAK_MESSAGE_CAPACITY> peak_message_doc;
 
 void connectToMQTTBroker(WiFiClient& client)
@@ -46,13 +49,16 @@ bool mqtt_init(WiFiClient &wiClient)
     n = serializeJson(doc, mqtt_buffer);
     mqttClient.publish(topic, mqtt_buffer, n, true, 2);
 }
-bool send_mqtt_quake(double freq, double mag)
+bool send_mqtt_quake(double freq, double mag, unsigned long timestamp, double latitude, double longitude)
 {
     char topic[64];
     snprintf(topic, 64, MQTT_TOPIC_PEAKS, formatted_mac().c_str());
     peak_message_doc["frequency"] = freq;
     peak_message_doc["magnitude"] = mag;
     peak_message_doc["mercalli"] = g_to_mercalli(mag);
+    peak_message_doc["ts_s"] = timestamp;
+    peak_message_doc["lat"] = latitude;
+    peak_message_doc["lng"] = longitude;
     size_t n = serializeJson(peak_message_doc, mqtt_buffer);
     return mqttClient.publish(topic, mqtt_buffer, n, 0);
 }

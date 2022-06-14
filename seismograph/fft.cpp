@@ -1,3 +1,4 @@
+#include "fft.h"
 #include "arduinoFFT.h"
 arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
 

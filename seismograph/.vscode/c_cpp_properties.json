@@ -37,7 +37,8 @@
                 "/home/lsdpirate/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include/c++/7.2.1/backward",
                 "/home/lsdpirate/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/lib/gcc/arm-none-eabi/7.2.1/include",
                 "/home/lsdpirate/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/lib/gcc/arm-none-eabi/7.2.1/include-fixed",
-                "/home/lsdpirate/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include"
+                "/home/lsdpirate/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/arm-none-eabi/include",
+                "${workspaceFolder}/include"
             ],
             "forcedInclude": [
                 "/home/lsdpirate/.arduino15/packages/arduino/hardware/samd/1.8.13/cores/arduino/Arduino.h"
@@ -504,7 +505,8 @@
                 "__ATOMIC_ACQ_REL=4",
                 "__ATOMIC_RELEASE=3",
                 "USBCON"
-            ]
+            ],
+            "configurationProvider": "ms-vscode.makefile-tools"
         }
     ]
 }

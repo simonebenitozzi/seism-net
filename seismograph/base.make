@@ -1,5 +1,5 @@
 .compile:
-	arduino-cli compile --fqbn ${FQBN} .
+	arduino-cli compile --library include --fqbn ${FQBN} . 
 .upload: .compile
 	arduino-cli upload --fqbn ${FQBN} --port ${PORT} .
 .monitor:
