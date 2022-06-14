@@ -6,14 +6,14 @@ from telegram import Update, Bot
 import telegram
 import telegram.ext
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-from seism_alert import SeismAlertWatch, WebSeismicEvent
+from seism_alert import SeismAlertWatch
 
 # import mysql.connector
 
 from geopy.geocoders import Nominatim
 
 from db import SeismEventSubscriptionMapper, DBPool, DBConnectionInfo, SeismEventMapper
-from master_node import MQTTAppplication, MQTTSeismicEvent, NewMQTTApplication
+from master_node import SeismicEvent, NewMQTTApplication
 
 
 telegram_token = "5512730466:AAF8CiMl8yUz3Kg1og6oPW9f6MoPtBUHhSg"
@@ -88,7 +88,7 @@ class EarthquakeTelegramBot:
 
         self.seism_alert_watch = SeismAlertWatch(60)
 
-        self.mqtt_app = NewMQTTApplication('localhost', 1883, 'master_node')
+        self.mqtt_app = NewMQTTApplication('149.132.182.144', 1883, 'master_node')
         self.mqtt_app.connect()
         self.seismic_event_mapper = SeismEventMapper()
         self.seism_subscription_mapper = SeismEventSubscriptionMapper()
@@ -116,11 +116,11 @@ class EarthquakeTelegramBot:
         })
 
 
-    async def on_mqtt_event(self, event : MQTTSeismicEvent):
+    async def on_mqtt_event(self, event : SeismicEvent):
         self.logger.info('Received seismic event')
         await self.seismic_event_mapper.log_quake(event)
 
-    async def on_seism_api_event(self, event : WebSeismicEvent):
+    async def on_seism_api_event(self, event : SeismicEvent):
         to_alert_users = await self.seism_subscription_mapper.get_all_subs_in_radius(event.latitude, event.longitude)
         text = f"""
 There has been an earthquake in range of your selection:
