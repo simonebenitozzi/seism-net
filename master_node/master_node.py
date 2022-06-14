@@ -32,7 +32,10 @@ class SeismicEvent:
             time = int(data['properties']['time']),
             latitude = float(data['geometry']['coordinates'][1]),
             longitude = float(data['geometry']['coordinates'][0]),
-            depth = float(data['geometry']['coordinates'][2])
+            depth = float(data['geometry']['coordinates'][2]),
+            mercalli = None,
+            sensor_id= data['properties']['net'],
+            frequency=None,
         )
 
 
@@ -56,7 +59,6 @@ class NewMQTTApplication:
 
     async def loop(self, ctx):
         while ctx.application.running:
-            print("loop")
             self.client.loop()
             while not self.__event_queue.empty():
                 ev = self.__event_queue.get()
@@ -74,6 +76,7 @@ class NewMQTTApplication:
         if topic_parts[1] == "seism" and topic_parts[-1] == "events":
             sensor_id = topic_parts[2]
             data = json.loads(msg.payload.decode('ascii'))
+            print(data)
             event = SeismicEvent(
                 magnitude=float(data['magnitude']),
                 frequency=float(data['frequency']),
@@ -81,7 +84,8 @@ class NewMQTTApplication:
                 time=int(data['ts_s']),
                 latitude=float(data['lat']),
                 longitude=float(data['lng']),
-                sensor_id=sensor_id)
+                sensor_id=sensor_id,
+                depth = str('NA'))
             self.__event_queue.put(event)
 
 

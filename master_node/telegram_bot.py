@@ -116,11 +116,7 @@ class EarthquakeTelegramBot:
         })
 
 
-    async def on_mqtt_event(self, event : SeismicEvent):
-        self.logger.info('Received seismic event')
-        await self.seismic_event_mapper.log_quake(event)
-
-    async def on_seism_api_event(self, event : SeismicEvent):
+    async def alert_users(self, event : SeismicEvent):
         to_alert_users = await self.seism_subscription_mapper.get_all_subs_in_radius(event.latitude, event.longitude)
         text = f"""
 There has been an earthquake in range of your selection:
@@ -130,6 +126,14 @@ Longitude: {event.longitude}
         """
         for to_alert in to_alert_users:
             await self.application.updater.bot.send_message(to_alert['chat_id'], text)
+
+    async def on_mqtt_event(self, event : SeismicEvent):
+        self.logger.info('Received seismic event')
+        await self.seismic_event_mapper.log_quake(event)
+        await self.alert_users(event)
+
+    async def on_seism_api_event(self, event : SeismicEvent):
+        await self.alert_users(event)
 
 
     async def start_command(self, update: Update, context):
