@@ -1,8 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 import aiomysql
-from master_node import MQTTSeismicEvent
-from seism_alert import WebSeismicEvent
+from master_node import SeismicEvent
 
 @dataclass
 class DBConnectionInfo:
@@ -53,7 +52,7 @@ class SeismEventMapper:
     def __init__(self) -> None:
         self.pool = DBPool.get_instance().get_pool()
 
-    async def log_quake(self, seismic_event: MQTTSeismicEvent):
+    async def log_quake(self, seismic_event: SeismicEvent):
         async with self.pool.acquire() as conn:
             async with conn.cursor() as cur:
                 mySql_insert_query = """
