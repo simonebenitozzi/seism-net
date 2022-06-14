@@ -15,13 +15,25 @@ client_id = f'python-mqtt-{random.randint(0, 100)}'
 # username = 'emqx'
 # password = 'public'
 
-
 @dataclass
-class MQTTSeismicEvent:
+class SeismicEvent:
     magnitude: float
     frequency: float
     mercalli: int
+    time: int
+    latitude: float
+    longitude: float
+    depth: float
     sensor_id: str
+    @classmethod
+    def from_dict(cls, data):
+        return SeismicEvent(
+            magnitude = float(data['properties']['mag']),
+            time = int(data['properties']['time']),
+            latitude = float(data['geometry']['coordinates'][1]),
+            longitude = float(data['geometry']['coordinates'][0]),
+            depth = float(data['geometry']['coordinates'][2])
+        )
 
 
 class NewMQTTApplication:
@@ -44,9 +56,11 @@ class NewMQTTApplication:
 
     async def loop(self, ctx):
         while ctx.application.running:
+            print("loop")
             self.client.loop()
             while not self.__event_queue.empty():
                 ev = self.__event_queue.get()
+                print(ev)
                 await ctx.job.data['on_event_callback'](ev)
             await asyncio.sleep(3)
         print("MQTT Exiting")
@@ -60,10 +74,13 @@ class NewMQTTApplication:
         if topic_parts[1] == "seism" and topic_parts[-1] == "events":
             sensor_id = topic_parts[2]
             data = json.loads(msg.payload.decode('ascii'))
-            event = MQTTSeismicEvent(
+            event = SeismicEvent(
                 magnitude=float(data['magnitude']),
                 frequency=float(data['frequency']),
                 mercalli=int(data['mercalli']),
+                time=int(data['ts_s']),
+                latitude=float(data['lat']),
+                longitude=float(data['lng']),
                 sensor_id=sensor_id)
             self.__event_queue.put(event)
 
