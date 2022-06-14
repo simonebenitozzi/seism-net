@@ -5,24 +5,7 @@ import aiohttp
 import logging
 import time
 from telegram.ext import Job
-
-@dataclass
-class WebSeismicEvent:
-    magnitude: float
-    time: int
-    latitude: float
-    longitude: float
-    depth: float
-
-    @classmethod
-    def from_dict(cls, data):
-        return WebSeismicEvent(
-            magnitude = float(data['properties']['mag']),
-            time = int(data['properties']['time']),
-            latitude = float(data['geometry']['coordinates'][1]),
-            longitude = float(data['geometry']['coordinates'][0]),
-            depth = float(data['geometry']['coordinates'][2])
-        )
+from master_node import SeismicEvent
 
 
 class SeismAlertWatch:
@@ -46,10 +29,10 @@ class SeismAlertWatch:
                     async with session.get(self.latest_seism_url) as response:
                         if response.status == 200:
                             json_data = await response.json()
-                            events: List[WebSeismicEvent] = []
+                            events: List[SeismicEvent] = []
                             latest_time = 0
                             for seism_data in json_data.get('features'):
-                                events.append(WebSeismicEvent.from_dict(seism_data))
+                                events.append(SeismicEvent.from_dict(seism_data))
                                 latest_time = max(latest_time, events[-1].time)
                             new_events = filter(
                                 lambda x: x.time > self.latest_seism_retrieved_time, events)
