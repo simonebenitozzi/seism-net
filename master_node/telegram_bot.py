@@ -8,8 +8,6 @@ import telegram.ext
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from seism_alert import SeismAlertWatch
 
-# import mysql.connector
-
 from geopy.geocoders import Nominatim
 
 from db import SeismEventSubscriptionMapper, DBPool, DBConnectionInfo, SeismEventMapper
@@ -37,7 +35,6 @@ connection_info = DBConnectionInfo(
 DBPool.get_instance(connection_info, asyncio.get_event_loop())
 
 
-
 # Converte coordinate da decimali a gradi
 def decdeg2dms(dd):
     is_positive = dd >= 0
@@ -54,6 +51,7 @@ async def event_updater():
         async with telegram.ext.Updater(test_bot, queue) as updater:
             await updater.bot.send_message(chat_id=my_chat_id, text='Hello')
 
+
 class EarthquakeTelegramBot:
 
     def __init__(self) -> None:
@@ -65,13 +63,15 @@ class EarthquakeTelegramBot:
 
         self.city_handler = CommandHandler('city', self.city_command)
         self.zipcode_handler = CommandHandler('zipcode', self.zipcode_command)
-        self.coordinates_handler = CommandHandler('coordinates', self.coordinates_command)
+        self.coordinates_handler = CommandHandler(
+            'coordinates', self.coordinates_command)
         self.radius_handler = CommandHandler('radius', self.radius_command)
         self.status_handler = CommandHandler('status', self.status_command)
 
         self.text_handler = MessageHandler(
             filters.TEXT & (~filters.COMMAND), self.unknown_command)
-        self.unknown_handler = MessageHandler(filters.COMMAND, self.unknown_command)
+        self.unknown_handler = MessageHandler(
+            filters.COMMAND, self.unknown_command)
 
         self.application.add_handler(self.start_handler)
         self.application.add_handler(self.help_handler)
@@ -84,42 +84,36 @@ class EarthquakeTelegramBot:
 
         self.application.add_handler(self.text_handler)
         self.application.add_handler(self.unknown_handler)
-        
 
         self.seism_alert_watch = SeismAlertWatch(60)
 
-        self.mqtt_app = NewMQTTApplication('149.132.182.144', 1883, 'master_node')
+        self.mqtt_app = NewMQTTApplication(
+            'localhost', 1883, 'master_node')
         self.mqtt_app.connect()
         self.seismic_event_mapper = SeismEventMapper()
         self.seism_subscription_mapper = SeismEventSubscriptionMapper()
-        
-        
+
         self.application.post_init = self.schedule_auxiliary_tasks
         self.application.run_polling(stop_signals=None, close_loop=False)
         asyncio.run(DBPool.get_instance().close())
         asyncio.run(self.mqtt_app.stop())
-        
-
-
-    # async def start(self):
-    #     await self.application.initialize()
-    #     await self.schedule_auxiliary_tasks(None)
-    #     await self.application.start()
-    #     await self.application.updater.
 
     async def schedule_auxiliary_tasks(self, args):
-        self.application.job_queue.run_custom(self.seism_alert_watch.task, {}, data = {
-            'on_alert_callback' : self.on_seism_api_event
+        self.application.job_queue.run_custom(self.seism_alert_watch.task, {}, data={
+            'on_alert_callback': self.on_seism_api_event
         })
-        self.application.job_queue.run_custom(self.mqtt_app.loop, {}, data = {
-            'on_event_callback' : self.on_mqtt_event
+        self.application.job_queue.run_custom(self.mqtt_app.loop, {}, data={
+            'on_event_callback': self.on_mqtt_event
         })
 
-
-    async def alert_users(self, event : SeismicEvent):
+    async def alert_users(self, event: SeismicEvent):
         to_alert_users = await self.seism_subscription_mapper.get_all_subs_in_radius(event.latitude, event.longitude)
+        geolocator = Nominatim(user_agent=geolocator_username)
+        event_location_name = geolocator.reverse(
+            f"{event.latitude},{event.longitude}", exactly_one=True)
         text = f"""
 There has been an earthquake in range of your selection:
+Location: {event_location_name.address}
 Magnitude: {event.magnitude}
 Latitude: {event.latitude}
 Longitude: {event.longitude}
@@ -127,18 +121,16 @@ Longitude: {event.longitude}
         for to_alert in to_alert_users:
             await self.application.updater.bot.send_message(to_alert['chat_id'], text)
 
-    async def on_mqtt_event(self, event : SeismicEvent):
+    async def on_mqtt_event(self, event: SeismicEvent):
         self.logger.info('Received seismic event')
         await self.seismic_event_mapper.log_quake(event)
         await self.alert_users(event)
 
-    async def on_seism_api_event(self, event : SeismicEvent):
+    async def on_seism_api_event(self, event: SeismicEvent):
         await self.alert_users(event)
-
 
     async def start_command(self, update: Update, context):
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Welcome on the overlap Bot!\nPlease enter your Location and a Radius of your choice, using the apposite commands. /help")
-
 
     async def help_command(self, update: Update, context):
         help_message = f"""I can help you subscribe for Earthquakes updates\n\nYou can control me by sending these commands:\n
@@ -149,19 +141,18 @@ Longitude: {event.longitude}
     /status - Get info about the information you inserted"""
         await context.bot.send_message(chat_id=update.effective_chat.id, text=help_message)
 
-
     async def city_command(self, update: Update, context):
         chat_id = update.effective_chat.id
         text = update.message.text
         if len(text) < 7:
             await context.bot.send_message(chat_id=update.effective_chat.id,
-                                        text="No city inserted")
+                                           text="No city inserted")
             return
 
         city = text[6:]
         geolocator = Nominatim(user_agent=geolocator_username)
         loc = geolocator.geocode(city)
-        
+
         if loc == None:
             await context.bot.send_message(chat_id=update.effective_chat.id,
                                            text="Error: your city was not found")
@@ -170,11 +161,10 @@ Longitude: {event.longitude}
             status = await self.seism_subscription_mapper.get_status(chat_id)
             if status['radius']:  # checks if radius is already inserted
                 await context.bot.send_message(chat_id=update.effective_chat.id,
-                                            text="Your Location has been updated!\nYou're ready to receive your updates!")
+                                               text="Your Location has been updated!\nYou're ready to receive your updates!")
             else:
                 await context.bot.send_message(chat_id=update.effective_chat.id,
-                                            text="Your Location has been updated!\nRadius has not been inserted yet")
-
+                                               text="Your Location has been updated!\nRadius has not been inserted yet")
 
     async def zipcode_command(self, update: Update, context):
         chat_id = update.effective_chat.id
@@ -187,7 +177,8 @@ Longitude: {event.longitude}
         geolocator = Nominatim(user_agent=geolocator_username)
         loc = geolocator.geocode(zipcode)
         if loc == None:
-            context.bot.send_message(chat_id=update.effective_chat.id, text="The zipcode you entered was not found.")
+            context.bot.send_message(
+                chat_id=update.effective_chat.id, text="The zipcode you entered was not found.")
         else:
             await self.seism_subscription_mapper.insert_coordinates(chat_id, loc.latitude, loc.longitude)
             status = await self.seism_subscription_mapper.get_status(chat_id)
@@ -195,7 +186,6 @@ Longitude: {event.longitude}
                 await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nYou're ready to receive your updates!")
             else:
                 await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
-
 
     async def coordinates_command(self, update: Update, context):
         chat_id = update.effective_chat.id
@@ -227,7 +217,6 @@ Longitude: {event.longitude}
             else:
                 await context.bot.send_message(chat_id=update.effective_chat.id, text="Your Location has been updated!\nRadius has not been inserted yet")
 
-
     async def radius_command(self, update: Update, context):
         chat_id = update.effective_chat.id
         text = update.message.text
@@ -253,7 +242,6 @@ Longitude: {event.longitude}
             else:
                 await context.bot.send_message(chat_id=update.effective_chat.id, text="Radius has been updated!\nYour Location has not been inserted yet")
 
-
     async def status_command(self, update: Update, context):
         chat_id = update.effective_chat.id
 
@@ -268,10 +256,8 @@ Longitude: {event.longitude}
         elif not status['radius']:
             await context.bot.send_message(chat_id=update.effective_chat.id, text="You haven't inserted your Radius yet. /help")
 
-
     async def unknown_command(self, update: Update, context):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command. /help")
-
 
 
 if __name__ == '__main__':
