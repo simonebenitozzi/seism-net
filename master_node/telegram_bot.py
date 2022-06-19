@@ -277,5 +277,3 @@ Longitude: {event.longitude}
 if __name__ == '__main__':
 
     bot = EarthquakeTelegramBot()
-
-    # asyncio.run(bot.start())
