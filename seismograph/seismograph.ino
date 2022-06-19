@@ -15,6 +15,8 @@
 #define LATITUDE 45.46414679486616 
 #define LONGITUDE 9.190254360602433
 
+#define POWER_SLEEP_DURATION_MS 25
+
 
 #define SCL_INDEX 0x00
 #define SCL_TIME 0x01
@@ -131,9 +133,9 @@ void loop()
     }
     else
     {
-        LowPower.idle(25);
-        last_read -= 25;
-        last_raw_send -= 25;
+        LowPower.idle(POWER_SLEEP_DURATION_MS);
+        last_read -= POWER_SLEEP_DURATION_MS;
+        last_raw_send -= POWER_SLEEP_DURATION_MS;
     }
     delay(1);
 }
