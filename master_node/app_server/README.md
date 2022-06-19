@@ -1,0 +1,1 @@
+This Flask application exposes a single HTTP API endpoint to retrieve past seismic events registered by the network.

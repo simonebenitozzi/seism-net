@@ -11,7 +11,7 @@ from seism_alert import SeismAlertWatch
 from geopy.geocoders import Nominatim
 
 from db import SeismEventSubscriptionMapper, DBPool, DBConnectionInfo, SeismEventMapper
-from master_node import SeismicEvent, NewMQTTApplication
+from master_node import SeismicEvent, MQTTApplication
 
 
 telegram_token = "5512730466:AAF8CiMl8yUz3Kg1og6oPW9f6MoPtBUHhSg"
@@ -24,33 +24,6 @@ db_password = 'iot889407'
 
 
 geolocator_username = "overlap@group.com"
-
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-connection_info = DBConnectionInfo(
-    host=db_host, database=db_name, username=db_user, password=db_password)
-DBPool.get_instance(connection_info, asyncio.get_event_loop())
-
-
-# Converte coordinate da decimali a gradi
-def decdeg2dms(dd):
-    is_positive = dd >= 0
-    dd = abs(dd)
-    minutes, seconds = divmod(dd*3600, 60)
-    degrees, minutes = divmod(minutes, 60)
-    degrees = degrees if is_positive else -degrees
-    return (degrees, minutes, seconds)
-
-
-async def event_updater():
-    queue = Queue()
-    async with Bot(telegram_token) as test_bot:
-        async with telegram.ext.Updater(test_bot, queue) as updater:
-            await updater.bot.send_message(chat_id=my_chat_id, text='Hello')
-
 
 class EarthquakeTelegramBot:
 
@@ -87,7 +60,7 @@ class EarthquakeTelegramBot:
 
         self.seism_alert_watch = SeismAlertWatch(60)
 
-        self.mqtt_app = NewMQTTApplication(
+        self.mqtt_app = MQTTApplication(
             'localhost', 1883, 'master_node')
         self.mqtt_app.connect()
         self.seismic_event_mapper = SeismEventMapper()
@@ -261,5 +234,11 @@ Longitude: {event.longitude}
 
 
 if __name__ == '__main__':
-
     bot = EarthquakeTelegramBot()
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+    connection_info = DBConnectionInfo(
+            host=db_host, database=db_name, username=db_user, password=db_password)
+    DBPool.get_instance(connection_info, asyncio.get_event_loop())
